@@ -1,0 +1,24 @@
+.TH libip 1  "January, 2013" "@PACKAGE_VERSION@" "USER COMMANDS"
+.SH NAME
+libip \- IP address manipulation library
+.SH SYNOPSIS
+.B This is a library!
+.SH DESCRIPTION
+Build and manipulate IP addresses, IP ranges and networks.
+
+Read ip.h for detailed API information.
+
+.SH NOTES
+This man page sucks.
+
+.SH BUGS
+This program does not have bugs. It only has crazy, dangerous and unuseful
+undocumented features.
+
+.SH AUTHOR
+Gerardo García Peña (killabytenow (at) gmail.com)
+.PP
+Visit Dosis's home page.
+.RS
+http://dosis.xxx.net/
+.RE
