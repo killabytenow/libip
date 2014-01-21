@@ -4,8 +4,8 @@
  * Build and manipulate IP and networks.
  *
  * ---------------------------------------------------------------------------
- * DioNiSio - DNS scanner
- *   (C) 2006-2009 Gerardo García Peña
+ * libip - IP address manipulation library
+ *   (C) 2013 Gerardo García Peña <killabytenow@gmail.com>
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the Free
@@ -23,12 +23,10 @@
  *
  *****************************************************************************/
 
-#include <config.h>
-#include "ip.h"
-#include "log.h"
+#include "libip.h"
 
-#define IPV4_GETP(p,x)  ((unsigned) ((ntohl((x)->addr) >> ((p)*8)) & 0x000000ffl))
-#define IPV6_GETB(p,x)  ((unsigned) ((x)->addr[(p)]))
+#define IPV4_GETP(p,x)  ((unsigned char) ((ntohl((x)->addr) >> ((p)*8)) & 0x000000ffl))
+#define IPV6_GETB(p,x)  ((unsigned char) ((x)->addr[(p)]))
 
 static int ip_read(char *network, char *s, INET_IPV4_ADDR_T *addr, INET_IPV4_ADDR_T rest)
 {
@@ -45,9 +43,10 @@ static int ip_read(char *network, char *s, INET_IPV4_ADDR_T *addr, INET_IPV4_ADD
     sscanf(s, "%d", &num);
     if(num < 0 || num > 255)
     {
-      ERR("Bad component in address '%s'.", network);
+      errno = EINVAL; /* Bad component in address */
       return -1;
     }
+
     *addr = (*addr) << 8;
     *addr = (*addr) | num;
     netmask <<= 8;
@@ -57,14 +56,14 @@ static int ip_read(char *network, char *s, INET_IPV4_ADDR_T *addr, INET_IPV4_ADD
   {
     if(!rest)
     {
-      ERR("Need more components in address '%s'.", network);
+      errno = EINVAL; /* Need more components in address */
       return -1;
     } else
       *addr = (rest & netmask) | *addr;
   } else
     if(s)
     {
-      ERR("Too much components in address '%s'.", network);
+      errno = EINVAL; /* Too much components in address */
       return -1;
     }
 
@@ -82,7 +81,7 @@ static int ip_read_network(char *network, char *s, INET_IPV4_RANGE *range)
   sscanf(s2, "%d", &bits);
   if(bits < 0 || bits > 32)
   {
-    ERR("Bad network address '%s'.", network);
+    errno = EINVAL; /* Bad network address */
     return -1;
   }
   netmask = (0xffffffffL << (32 - bits));
@@ -123,7 +122,10 @@ int ip_read_range(char *network, INET_IPV4_RANGE *range)
   int ret = 0;
 
   if((s = strdup(network)) == NULL)
-    FAT("No memory for network.");
+  {
+    errno = ENOMEM; /* No memory for network */
+    return -1;
+  }
 
   if(strrchr(s, '/') != NULL)
     ret = ip_read_network(network, s, range);
@@ -140,7 +142,7 @@ int ip_read_range(char *network, INET_IPV4_RANGE *range)
   return ret;
 }
 
-void ip_socket_to_addr(BIG_SOCKET_PTR saddr, INET_ADDR *addr, int *port)
+int ip_socket_to_addr(BIG_SOCKET_PTR saddr, INET_ADDR *addr, int *port)
 {
   switch(saddr.sa->sa_family)
   {
@@ -157,17 +159,21 @@ void ip_socket_to_addr(BIG_SOCKET_PTR saddr, INET_ADDR *addr, int *port)
       addr->type = INET_FAMILY_IPV6;
       if(port)
         *port = saddr.in6->sin6_port;
-#else
-      FAT("This platform does not support IPv6.");
-#endif
       break;
+#else
+      errno = EPFNOSUPPORT;
+      return -1;
+#endif
 
     default:
-      FAT("Unknown internet protocol %d.", saddr.sa->sa_family);
+      errno = EPFNOSUPPORT; /* Unknown internet protocol */
+      return -1;
   }
+
+  return 0;
 }
 
-void ip_addr_to_socket(INET_ADDR *addr, int port, struct sockaddr *saddr)
+int ip_addr_to_socket(INET_ADDR *addr, int port, struct sockaddr *saddr)
 {
   switch(addr->type)
   {
@@ -197,14 +203,18 @@ void ip_addr_to_socket(INET_ADDR *addr, int port, struct sockaddr *saddr)
         sin6->sin6_port = htons(port);
         memcpy(&sin6->sin6_addr, addr->in6.addr, sizeof(addr->in6));
       }
-#else
-      FAT("This platform does not support IPv6.");
-#endif
       break;
+#else
+      errno = EPFNOSUPPORT; /* This platform does not support IPv6 */
+      return -1;
+#endif
 
     default:
-      FAT("Unknown internet protocol %d.", addr->type);
+      errno = EPFNOSUPPORT; /* Unknown internet protocol */
+      return -1;
   }
+
+  return 0;
 }
 
 struct sockaddr *ip_addr_get_socket(INET_ADDR *addr, int port)
@@ -223,15 +233,20 @@ struct sockaddr *ip_addr_get_socket(INET_ADDR *addr, int port)
       bytes = sizeof(struct sockaddr_in6);
       break;
 #else
-      FAT("This platform does not implement IPv6.");
+      errno = EPFNOSUPPORT; /* This platform does not support IPv6 */
+      return NULL;
 #endif
     default:
-      FAT("Unknown internet protocol %d.", addr->type);
+      errno = EPFNOSUPPORT; /* Unknown internet protocol */
+      return NULL;
   }
 
   /* get memory */
   if((saddr = malloc(bytes)) == NULL)
-    FAT("No memory for a sockaddr_in structure.");
+  {
+    errno = ENOMEM; /* No memory for a sockaddr_in structure */
+    return NULL;
+  }
 
   /* fill sockaddr structure */
   ip_addr_to_socket(addr, port, saddr);
@@ -264,25 +279,23 @@ void ip_addr_copy(INET_ADDR *to, INET_ADDR *from)
 int ip_addr_snprintf_ipv4(INET_ADDR *addr, int port, int l, char *str)
 {
   int r;
-  char buff[INET_ADDR_MAXLEN+1];
 
   if(addr->type != INET_FAMILY_IPV4)
   {
-    ip_addr_snprintf(addr, port, sizeof(buff), buff);
-    ERR("Address '%s' is not an IPv4 address.", buff);
+    errno = EINVAL; /* It is not an IPv4 address */
     return -1;
   }
 
   if(port >= 0)
   {
-    r = snprintf(str, l, "%d.%d.%d.%d:%d",
+    r = snprintf(str, l, "%u.%u.%u.%u:%u",
                     IPV4_GETP(3, &addr->in),
                     IPV4_GETP(2, &addr->in),
                     IPV4_GETP(1, &addr->in),
                     IPV4_GETP(0, &addr->in),
                     port);
   } else {
-    r = snprintf(str, l, "%d.%d.%d.%d",
+    r = snprintf(str, l, "%u.%u.%u.%u",
                     IPV4_GETP(3, &addr->in),
                     IPV4_GETP(2, &addr->in),
                     IPV4_GETP(1, &addr->in),
@@ -294,12 +307,9 @@ int ip_addr_snprintf_ipv4(INET_ADDR *addr, int port, int l, char *str)
 
 int ip_addr_snprintf_ipv6(INET_ADDR *addr, int port, int l, char *str)
 {
-  char buff[INET_ADDR_MAXLEN+1];
-
   if(addr->type != INET_FAMILY_IPV6)
   {
-    ip_addr_snprintf(addr, port, sizeof(buff), buff);
-    ERR("Address '%s' is not an IPv6 address.", buff);
+    errno = EINVAL; /* It is not an IPv6 address */
     return -1;
   }
 
@@ -332,7 +342,7 @@ int ip_addr_snprintf(INET_ADDR *addr, int port, int l, char *str)
 
 int ip_snprintf_ipv4(INET_IPV4_ADDR *in, int port, int l, char *str)
 {
-  return snprintf(str, l, "%d.%d.%d.%d",
+  return snprintf(str, l, "%u.%u.%u.%u",
                   IPV4_GETP(3, in),
                   IPV4_GETP(2, in),
                   IPV4_GETP(1, in),
@@ -393,9 +403,14 @@ int ip_addr_parse_ipv4(char *saddr, INET_ADDR *addr, int *port)
            | ((b & 0x000000ffl) << 16)
            | ((a & 0x000000ffl) << 24));
 
-  if(port)
+  if(port_defined)
+  {
+    if(!port)
+      return -1; /* port set, but not accepted */
+
     *port = port_defined ?  p : -1;
-  
+  }
+
   return 0;
 }
 
@@ -416,61 +431,54 @@ int ip_addr_parse(char *saddr, INET_ADDR *addr, int *port)
   return -1;
 }
 
-unsigned int ip_addr_get_part_ipv4(INET_ADDR *addr, int part)
+int ip_addr_get_part_ipv4(INET_ADDR *addr, int part)
 {
-  char buff[INET_ADDR_MAXLEN+1];
-
   if(addr->type != INET_FAMILY_IPV4 || part < 1 || part > 4)
   {
-    ip_addr_snprintf(addr, -1, sizeof(buff), buff);
-    FAT("Bad IPv4 address '%s' or invalid part number (%d).", buff, part);
+    errno = EINVAL; /* Bad IPv4 address or invalid part number */
+    return -1;
   }
 
   return IPV4_GETP(part-1, &addr->in);
 }
 
-unsigned int ip_addr_get_part_ipv6_nibble(INET_ADDR *addr, int part)
+int ip_addr_get_part_ipv6_nibble(INET_ADDR *addr, int part)
 {
-  char buff[INET_ADDR_MAXLEN + 1];
   int byte, desp;
 
   if(addr->type != INET_FAMILY_IPV6 || part < 1 || part > 32)
   {
-    ip_addr_snprintf(addr, -1, sizeof(buff), buff);
-    FAT("Bad IPv6 address '%s' or invalid nibble-part number (%d).", buff, part);
+    errno = EINVAL; /* Bad IPv6 address or invalid nibble-part number */
+    return -1;
   }
 
   byte = (part - 1) >> 1;
   desp = (part - 1) & 1 ? 0 : 4;
 
-  return (IPV6_GETB(byte, &addr->in6) >> desp) & 0x0f;
+  return ((IPV6_GETB(byte, &addr->in6) >> desp) & 0x0f);
 }
 
-unsigned int ip_addr_get_part_ipv6_byte(INET_ADDR *addr, int part)
+int ip_addr_get_part_ipv6_byte(INET_ADDR *addr, int part)
 {
-  char buff[INET_ADDR_MAXLEN+1];
-
   if(addr->type != INET_FAMILY_IPV6 || part < 1 || part > 16)
   {
-    ip_addr_snprintf(addr, -1, sizeof(buff), buff);
-    FAT("Bad IPv6 address '%s' or invalid byte-part number (%d).", buff, part);
+    errno = EINVAL; /* Bad IPv6 address or invalid byte-part number */
+    return -1;
   }
 
   return IPV6_GETB(part - 1, &addr->in6);
 }
 
-unsigned int ip_addr_get_part_ipv6_word(INET_ADDR *addr, int part)
+int ip_addr_get_part_ipv6_word(INET_ADDR *addr, int part)
 {
-  char buff[INET_ADDR_MAXLEN+1];
-
   if(addr->type != INET_FAMILY_IPV6 || part < 1 || part > 8)
   {
-    ip_addr_snprintf(addr, -1, sizeof(buff), buff);
-    FAT("Bad IPv6 address '%s' or invalid word-part number (%d).", buff, part);
+    errno = EINVAL; /* Bad IPv6 address or invalid word-part number */
+    return -1;
   }
 
-  return IPV6_GETB(((part - 1) * 2) + 0, &addr->in6) << 8
-       | IPV6_GETB(((part - 1) * 2) + 1, &addr->in6);
+  return (IPV6_GETB(((part - 1) * 2) + 0, &addr->in6) << 8
+         | IPV6_GETB(((part - 1) * 2) + 1, &addr->in6));
 }
 
 int ip_addr_check_mask(INET_ADDR *addr, INET_ADDR *netw, INET_ADDR *mask)

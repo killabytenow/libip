@@ -4,8 +4,8 @@
  * Build and manipulate IP and networks.
  *
  * ---------------------------------------------------------------------------
- * DioNiSio - DNS scanner
- *   (C) 2006-2009 Gerardo García Peña
+ * libip - IP address manipulation library
+ *   (C) 2013 Gerardo García Peña <killabytenow@gmail.com>
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the Free
@@ -26,7 +26,7 @@
 #ifndef __IP_H__
 #define __IP_H__
 
-#include <config.h>
+#include "config.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -50,12 +50,15 @@ typedef union _tag_INET_IPV6_ADDR {
 } INET_IPV6_ADDR;
 
 typedef union _tag_BIG_SOCKET {
-  struct sockaddr     sa;
-  struct sockaddr_in  in;
-#if HAVE_STRUCT_SOCKADDR_IN6
-  struct sockaddr_in6 in6;
-#endif
-} BIG_SOCKET;
+  union {
+    struct sockaddr     sa;
+    struct sockaddr_in  in;
+#   if HAVE_STRUCT_SOCKADDR_IN6
+    struct sockaddr_in6 in6;
+#   endif
+  };
+  int size;
+} BIG_SOCKADDR;
 
 typedef union __attribute__ ((__transparent_union__))
 {
@@ -64,7 +67,8 @@ typedef union __attribute__ ((__transparent_union__))
 #if HAVE_STRUCT_SOCKADDR_IN6
   struct sockaddr_in6 *in6;
 #endif
-} BIG_SOCKET_PTR;
+  BIG_SOCKADDR        *bsa;
+} BIG_SOCKADDR_PTR;
 
 #define BIG_SOCKET_TO_SOCKADDR(x)       ((struct sockaddr *) &(x))
 
@@ -109,19 +113,20 @@ void ip_addr_set_ipv4(INET_ADDR *addr, INET_IPV4_ADDR *in);
 void ip_addr_set_ipv6(INET_ADDR *addr, INET_IPV6_ADDR *in);
 void ip_addr_copy(INET_ADDR *to, INET_ADDR *from);
 
-void             ip_socket_to_addr(BIG_SOCKET_PTR saddr, INET_ADDR *addr, int *port);
-void             ip_addr_to_socket(INET_ADDR *addr, int port, BIG_SOCKET_PTR saddr);
-struct sockaddr *ip_addr_get_socket(INET_ADDR *addr, int port);
-
 int ip_snprintf_ipv4(INET_IPV4_ADDR *in, int port, int l, char *str);
 int ip_snprintf_ipv6(INET_IPV6_ADDR *in6, int port, int l, char *str);
 
-unsigned int ip_addr_get_part_ipv4(INET_ADDR *addr, int part);
-unsigned int ip_addr_get_part_ipv6_nibble(INET_ADDR *addr, int part);
-unsigned int ip_addr_get_part_ipv6_byte(INET_ADDR *addr, int part);
-unsigned int ip_addr_get_part_ipv6_word(INET_ADDR *addr, int part);
+int ip_addr_get_part_ipv4(INET_ADDR *addr, int part);
+int ip_addr_get_part_ipv6_nibble(INET_ADDR *addr, int part);
+int ip_addr_get_part_ipv6_byte(INET_ADDR *addr, int part);
+int ip_addr_get_part_ipv6_word(INET_ADDR *addr, int part);
 
 int ip_addr_check_mask(INET_ADDR *addr, INET_ADDR *net, INET_ADDR *mask);
+
+int              ip_sockaddr_to_addr(BIG_SOCKET_PTR saddr, INET_ADDR *addr, int *port);
+int              ip_addr_to_bigsockaddr(INET_ADDR *addr, int port, BIG_SOCKET_PTR saddr);
+BIG_SOCKET_ADDR *ip_addr_get_bigsockaddr(INET_ADDR *addr, int port, int &sasize);
+int              ip_get_socket(BIG_SOCKET_PTR saddr);
 
 #ifdef __cplusplus
 }
