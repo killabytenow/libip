@@ -1,0 +1,6 @@
+.deps
+Makefile
+Makefile.in
+aclocal.m4
+autoconfig.h
+autoconfig.h.in
