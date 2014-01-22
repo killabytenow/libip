@@ -140,7 +140,7 @@ int ip_read_range(char *network, INET_IPV4_RANGE *range)
 	return ret;
 }
 
-int ip_socket_to_addr(BIG_SOCKET_PTR saddr, INET_ADDR *addr, int *port)
+int ip_socket_to_addr(BIG_SOCKADDR_PTR saddr, INET_ADDR *addr, int *port)
 {
 	switch(saddr.sa->sa_family) {
 	case AF_INET:
@@ -242,7 +242,7 @@ struct sockaddr *ip_addr_get_socket(INET_ADDR *addr, int port)
 	}
 
 	/* fill sockaddr structure */
-	return ip_addr_to_socket(addr, port, saddr) ? NULLL : saddr;
+	return ip_addr_to_socket(addr, port, saddr) ? NULL : saddr;
 }
 
 void ip_addr_set_null(INET_ADDR *addr)

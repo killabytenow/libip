@@ -125,7 +125,7 @@ int ip_addr_check_mask(INET_ADDR *addr, INET_ADDR *net, INET_ADDR *mask);
 
 int              ip_sockaddr_to_addr(BIG_SOCKADDR_PTR saddr, INET_ADDR *addr, int *port);
 int              ip_addr_to_bigsockaddr(INET_ADDR *addr, int port, BIG_SOCKADDR_PTR saddr);
-BIG_SOCKET_ADDR *ip_addr_get_bigsockaddr(INET_ADDR *addr, int port, int &sasize);
+BIG_SOCKADDR_PTR ip_addr_get_bigsockaddr(INET_ADDR *addr, int port, int *sasize);
 int              ip_get_socket(BIG_SOCKADDR_PTR saddr);
 
 #ifdef __cplusplus
