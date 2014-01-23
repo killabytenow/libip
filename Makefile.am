@@ -31,10 +31,7 @@ doc_DATA = AUTHORS COPYING ChangeLog NEWS README BUGS
 dist_man1_MANS = libip.1
 
 lib_LIBRARIES = libip.a
-libip_a_SOURCES = libip.c libip.h config.h
-
-config.h : config.h.in autoconfig.h
-	m4 config.h.in > config.h
+libip_a_SOURCES = libip.c libip.h
 
 # Set the warning level to maximum and add directory 'include' to the include
 # search path.
