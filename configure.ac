@@ -107,17 +107,6 @@ else
 fi
 
 dnl ---------------------------------------------------------------------------
-dnl Basic configuration
-dnl ---------------------------------------------------------------------------
-
-AC_CHECK_SIZEOF(char)
-AC_CHECK_SIZEOF(short int)
-AC_CHECK_SIZEOF(int)
-AC_CHECK_SIZEOF(long int)
-AC_CHECK_SIZEOF(long long)
-AC_CHECK_SIZEOF(void *)
-
-dnl ---------------------------------------------------------------------------
 dnl Check that libraries are ok
 dnl ---------------------------------------------------------------------------
 

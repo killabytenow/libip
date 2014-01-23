@@ -26,7 +26,7 @@
 #ifndef __IP_H__
 #define __IP_H__
 
-#include "config.h"
+#include <arpa/inet.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -37,15 +37,15 @@ extern "C" {
 #define INET_FAMILY_IPV4   AF_INET     /* internetwork: UDP, TCP, etc. */
 #define INET_FAMILY_IPV6   AF_INET6    /* IPv6                         */
 
-typedef UINT32_T INET_IPV4_ADDR_T;
+typedef uint32_t INET_IPV4_ADDR_T;
 typedef union _tag_INET_IPV4_ADDR {
   INET_IPV4_ADDR_T addr;
   struct in_addr   inaddr;
 } INET_IPV4_ADDR;
 
 typedef union _tag_INET_IPV6_ADDR {
-  UINT8_T         addr[16];
-  UINT32_T        addr32[4];
+  uint8_t         addr[16];
+  uint32_t        addr32[4];
   struct in6_addr in6addr;
 } INET_IPV6_ADDR;
 

@@ -23,6 +23,18 @@
  *
  *****************************************************************************/
 
+#include "autoconfig.h"
+
+#if HAVE_STRING_H
+#  include <string.h>
+#else
+#  if HAVE_STRINGS_H
+#    include <strings.h>
+#  endif
+#endif
+#include <errno.h>
+#include <stdio.h>
+
 #include "libip.h"
 
 #define IPV4_GETP(p,x)  ((unsigned char) ((ntohl((x)->addr) >> ((p)*8)) & 0x000000ffl))
