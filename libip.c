@@ -153,21 +153,21 @@ int ip_read_range(char *network, INET_IPV4_RANGE *range)
 	return ret;
 }
 
-int ip_socket_to_addr(BIG_SOCKADDR_PTR saddr, INET_ADDR *addr, int *port)
+int ip_bigsockaddr_to_addr(BIGSOCKADDR *saddr, INET_ADDR *addr, int *port)
 {
-	switch(saddr.sa->sa_family) {
+	switch(saddr->sa.sa_family) {
 	case AF_INET:
-		addr->in.addr = saddr.in->sin_addr.s_addr;
+		addr->in.addr = saddr->in.sin_addr.s_addr;
 		addr->type = INET_FAMILY_IPV4;
 		if(port)
-			*port = saddr.in->sin_port;
+			*port = saddr->in.sin_port;
 		break;
 	case AF_INET6:
 #if HAVE_STRUCT_SOCKADDR_IN6
-		memcpy(addr->in6.addr, &saddr.in6->sin6_addr, sizeof(addr->in6));
+		memcpy(addr->in6.addr, &saddr->in6.sin6_addr, sizeof(addr->in6));
 		addr->type = INET_FAMILY_IPV6;
 		if(port)
-			*port = saddr.in6->sin6_port;
+			*port = saddr->in6.sin6_port;
 		break;
 #else
 		errno = EAFNOSUPPORT;
@@ -182,34 +182,28 @@ int ip_socket_to_addr(BIG_SOCKADDR_PTR saddr, INET_ADDR *addr, int *port)
 	return 0;
 }
 
-int ip_addr_to_socket(INET_ADDR *addr, int port, struct sockaddr *saddr)
+int ip_addr_to_bigsockaddr(INET_ADDR *addr, int port, BIGSOCKADDR *saddr)
 {
-	switch(addr->type) {
+	/* fill sockaddr structure */
+	switch(addr->type)
+	{
 	case INET_FAMILY_IPV4:
-		{
-			struct sockaddr_in *sin;
-
-			sin = (struct sockaddr_in *) saddr;
-			sin->sin_addr.s_addr = addr->in.addr;
-			sin->sin_family = AF_INET;
-			sin->sin_port = htons(port);
-			memset(&(sin->sin_zero), 0, 8);
-		}
+		saddr->in.sin_addr.s_addr = addr->in.addr;
+		saddr->in.sin_family = AF_INET;
+		saddr->in.sin_port = htons(port);
+		memset(&(saddr->in.sin_zero), 0, 8);
+		saddr->size = sizeof(struct sockaddr_in);
 		break;
 	case INET_FAMILY_IPV6:
 #if HAVE_STRUCT_SOCKADDR_IN6
-		{
-			struct sockaddr_in6 *sin6;
-
-			sin6 = (struct sockaddr_in6 *) saddr;
+		saddr->size = sizeof(struct sockaddr_in6);
 #ifdef SIN6_LEN
-			sin6->sin6_len = sizeof(struct sockaddr_in6);
+		saddr->in6.sin6_len = sizeof(struct sockaddr_in6);
 #endif
-			sin6->sin6_family = AF_INET6;
-			sin6->sin6_flowinfo = 0;
-			sin6->sin6_port = htons(port);
-			memcpy(&sin6->sin6_addr, addr->in6.addr, sizeof(addr->in6));
-		}
+		saddr->in6.sin6_family = AF_INET6;
+		saddr->in6.sin6_flowinfo = 0;
+		saddr->in6.sin6_port = htons(port);
+		memcpy(&saddr->in6.sin6_addr, addr->in6.addr, sizeof(addr->in6));
 		break;
 #else
 		errno = EAFNOSUPPORT; /* This platform does not support IPv6 */
@@ -224,38 +218,9 @@ int ip_addr_to_socket(INET_ADDR *addr, int port, struct sockaddr *saddr)
 	return 0;
 }
 
-struct sockaddr *ip_addr_get_socket(INET_ADDR *addr, int port)
+int ip_bigsockaddr_get_socket(BIGSOCKADDR *saddr, int type, int protocol)
 {
-	void *saddr = NULL;
-	int bytes = 0;
-
-	/* calc how many bytes uses this structure */
-	switch(addr->type)
-	{
-	case INET_FAMILY_IPV4:
-		bytes = sizeof(struct sockaddr_in);
-		break;
-	case INET_FAMILY_IPV6:
-#if HAVE_STRUCT_SOCKADDR_IN6
-		bytes = sizeof(struct sockaddr_in6);
-		break;
-#else
-		errno = EAFNOSUPPORT; /* This platform does not support IPv6 */
-		return NULL;
-#endif
-	default:
-		errno = EAFNOSUPPORT; /* Unknown internet protocol */
-		return NULL;
-	}
-
-	/* get memory */
-	if((saddr = malloc(bytes)) == NULL) {
-		errno = ENOMEM; /* No memory for a sockaddr_in structure */
-		return NULL;
-	}
-
-	/* fill sockaddr structure */
-	return ip_addr_to_socket(addr, port, saddr) ? NULL : saddr;
+	return socket(saddr->sa.sa_family, type, protocol);
 }
 
 void ip_addr_set_null(INET_ADDR *addr)

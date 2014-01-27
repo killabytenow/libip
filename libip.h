@@ -49,7 +49,7 @@ typedef union _tag_INET_IPV6_ADDR {
   struct in6_addr in6addr;
 } INET_IPV6_ADDR;
 
-typedef union _tag_BIG_SOCKET {
+typedef struct _tag_BIGSOCKADDR {
   union {
     struct sockaddr     sa;
     struct sockaddr_in  in;
@@ -58,19 +58,7 @@ typedef union _tag_BIG_SOCKET {
 #   endif
   };
   int size;
-} BIG_SOCKADDR;
-
-typedef union __attribute__ ((__transparent_union__))
-{
-  struct sockaddr     *sa;
-  struct sockaddr_in  *in;
-#if HAVE_STRUCT_SOCKADDR_IN6
-  struct sockaddr_in6 *in6;
-#endif
-  BIG_SOCKADDR        *bsa;
-} BIG_SOCKADDR_PTR;
-
-#define BIG_SOCKET_TO_SOCKADDR(x)       ((struct sockaddr *) &(x))
+} BIGSOCKADDR;
 
 #define INET_ADDR_MAXLEN_IPV6    39
 #define INET_ADDR_MAXLEN_IPV4    15
@@ -123,10 +111,9 @@ int ip_addr_get_part_ipv6_word(INET_ADDR *addr, int part);
 
 int ip_addr_check_mask(INET_ADDR *addr, INET_ADDR *net, INET_ADDR *mask);
 
-int              ip_sockaddr_to_addr(BIG_SOCKADDR_PTR saddr, INET_ADDR *addr, int *port);
-int              ip_addr_to_bigsockaddr(INET_ADDR *addr, int port, BIG_SOCKADDR_PTR saddr);
-BIG_SOCKADDR_PTR ip_addr_get_bigsockaddr(INET_ADDR *addr, int port, int *sasize);
-int              ip_get_socket(BIG_SOCKADDR_PTR saddr);
+int ip_bigsockaddr_to_addr(BIGSOCKADDR *saddr, INET_ADDR *addr, int *port);
+int ip_addr_to_bigsockaddr(INET_ADDR *addr, int port, BIGSOCKADDR *saddr);
+int ip_bigsockaddr_get_socket(BIGSOCKADDR *saddr, int type, int protocol);
 
 #ifdef __cplusplus
 }
